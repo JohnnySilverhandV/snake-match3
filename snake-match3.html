@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>蛇形三消 SNAKE://MATCH</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: #0b0e17;
+    background-image: radial-gradient(ellipse at 50% -10%, #1a2140 0%, #0b0e17 55%);
+    color: #dfe7ff;
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 14px 10px 30px;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .title {
+    font-size: 30px; font-weight: 800; letter-spacing: 3px;
+    background: linear-gradient(90deg, #4ea8ff, #b14eff 45%, #ff4d6d);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 30px rgba(177, 78, 255, .25);
+    margin-bottom: 2px; user-select: none;
+  }
+  .subtitle { font-size: 12px; color: #6b7699; letter-spacing: 2px; margin-bottom: 12px; user-select: none; }
+  .hud {
+    width: min(94vw, 504px); display: flex; gap: 8px; margin-bottom: 8px;
+  }
+  .hud .box {
+    flex: 1; background: #131829; border: 1px solid #232c4a; border-radius: 10px;
+    padding: 7px 10px; text-align: center;
+  }
+  .hud .label { font-size: 10px; color: #6b7699; letter-spacing: 2px; }
+  .hud .value { font-size: 20px; font-weight: 700; color: #eaf1ff; font-variant-numeric: tabular-nums; }
+  #scoreVal { color: #4ea8ff; text-shadow: 0 0 12px rgba(78,168,255,.5); }
+  .strip-wrap {
+    width: min(94vw, 504px); background: #131829; border: 1px solid #232c4a;
+    border-radius: 10px; padding: 6px 10px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px; min-height: 34px;
+  }
+  .strip-label { font-size: 10px; color: #6b7699; letter-spacing: 1px; white-space: nowrap; }
+  #strip { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; }
+  #strip .seg {
+    width: 13px; height: 13px; border-radius: 4px;
+    box-shadow: inset 0 -2px 3px rgba(0,0,0,.35);
+  }
+  #strip .seg.tail {
+    box-shadow: inset 0 -2px 3px rgba(0,0,0,.35), 0 0 0 1.5px rgba(255,255,255,.9);
+  }
+  #tailRun { margin-left: auto; white-space: nowrap; }
+  .stage { position: relative; width: min(94vw, 504px); }
+  canvas {
+    display: block; width: 100%; border-radius: 14px;
+    border: 1px solid #2a3560;
+    box-shadow: 0 0 40px rgba(78, 168, 255, .08), inset 0 0 60px rgba(0,0,0,.5);
+    background: #10141f;
+    touch-action: none;
+  }
+  .overlay {
+    position: absolute; inset: 0; border-radius: 14px;
+    background: rgba(8, 10, 20, .82); backdrop-filter: blur(3px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 20px; z-index: 5;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h2 {
+    font-size: 26px; letter-spacing: 4px; margin-bottom: 12px;
+    color: #fff; text-shadow: 0 0 18px rgba(78,168,255,.8);
+  }
+  .overlay h2.danger { text-shadow: 0 0 18px rgba(255,77,109,.8); }
+  .overlay p { font-size: 13px; color: #9aa8cc; line-height: 1.9; margin-bottom: 16px; }
+  .overlay .rule { color: #c7d3f5; }
+  .overlay .rule b { color: #ffd166; }
+  .overlay .final { font-size: 15px; color: #eaf1ff; margin-bottom: 16px; }
+  .overlay .final b { color: #4ea8ff; font-size: 22px; }
+  .btn {
+    background: linear-gradient(90deg, #2f6bff, #7a3cff);
+    color: #fff; border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 700; letter-spacing: 3px;
+    padding: 11px 34px; cursor: pointer;
+    box-shadow: 0 0 22px rgba(90, 90, 255, .45);
+    transition: transform .12s, box-shadow .12s;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(120, 100, 255, .65); }
+  .btn:active { transform: translateY(0); }
+  .dpad {
+    margin-top: 12px; display: grid; grid-template-columns: repeat(3, 56px);
+    grid-template-rows: repeat(2, 46px); gap: 6px; justify-content: center;
+  }
+  .dpad button {
+    background: #161d33; color: #8fa4d9; border: 1px solid #2a3560;
+    border-radius: 10px; font-size: 18px; cursor: pointer; user-select: none;
+  }
+  .dpad button:active { background: #233054; color: #fff; }
+  .dpad .up { grid-column: 2; grid-row: 1; }
+  .dpad .left { grid-column: 1; grid-row: 2; }
+  .dpad .down { grid-column: 2; grid-row: 2; }
+  .dpad .right { grid-column: 3; grid-row: 2; }
+  .legend {
+    width: min(94vw, 504px); margin-top: 10px;
+    display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center;
+    font-size: 11px; color: #6b7699;
+  }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
+  .hint { margin-top: 12px; font-size: 11px; color: #55618a; letter-spacing: 1px; text-align: center; line-height: 1.8; }
+  .hint kbd {
+    background: #1a2140; border: 1px solid #2f3a63; border-radius: 4px;
+    padding: 1px 6px; font-size: 10px; color: #9db1e8; margin: 0 1px;
+  }
+  @media (hover: none) { .hint .pc-only { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="title">SNAKE://MATCH</div>
+<div class="subtitle">贪吃蛇 × 三消 融合版</div>
+
+<div class="hud">
+  <div class="box"><div class="label">得分 SCORE</div><div class="value" id="scoreVal">0</div></div>
+  <div class="box"><div class="label">最高 BEST</div><div class="value" id="bestVal">0</div></div>
+  <div class="box"><div class="label">蛇身 LENGTH</div><div class="value" id="lenVal">4</div></div>
+</div>
+
+<div class="strip-wrap">
+  <span class="strip-label">蛇身色序</span>
+  <div id="strip"></div>
+  <span class="strip-label" id="tailRun">尾连 0/3</span>
+</div>
+
+<div class="stage">
+  <canvas id="game"></canvas>
+
+  <div class="overlay" id="startOverlay">
+    <h2>蛇形三消</h2>
+    <p class="rule">
+      吃到的色块挂在<b>蛇尾</b>；<b>只有吃的颜色与蛇尾当前颜色相同</b>才触发消除<br>
+      蛇尾同色凑满 <b>3 节及以上</b> 整段消除，异色块会一直挂在尾上存着<br>
+      消除后新蛇尾若又是 ≥3 的同色段则连锁：<b>双杀 → 三杀 → 四杀 → 五杀 → 超神</b><br>
+      4 连 <b>good!</b> · 5 连 <b>amazing!</b> · 6 连以上 <b>unbelievable!</b><br>
+      干扰块消不掉，会被相邻消除挤碎——用它垫位置、摆出连环阵型
+    </p>
+    <button class="btn" id="startBtn">开始游戏</button>
+  </div>
+
+  <div class="overlay hidden" id="pauseOverlay">
+    <h2>已暂停</h2>
+    <p>按 空格 或点击按钮继续</p>
+    <button class="btn" id="resumeBtn">继续</button>
+  </div>
+
+  <div class="overlay hidden" id="overOverlay">
+    <h2 class="danger">GAME OVER</h2>
+    <div class="final">本局得分 <b id="finalScore">0</b></div>
+    <button class="btn" id="retryBtn">再来一局</button>
+  </div>
+</div>
+
+<div class="legend">
+  <span><i style="background:linear-gradient(135deg,#ff4d6d,#ffb020)"></i>彩色食物 · 1~3 节</span>
+  <span><i style="background:#4ea8ff;box-shadow:2px -2px 0 rgba(78,168,255,.55),4px -4px 0 rgba(78,168,255,.3)"></i>叠层 · 1 格 2~4 节同色</span>
+  <span><i style="background:repeating-linear-gradient(45deg,#2c2640 0 2px,#8f7fc4 2px 4px)"></i>干扰块 · 消不掉</span>
+</div>
+
+<div class="dpad">
+  <button class="up"    data-d="up">▲</button>
+  <button class="left"  data-d="left">◀</button>
+  <button class="down"  data-d="down">▼</button>
+  <button class="right" data-d="right">▶</button>
+</div>
+
+<div class="hint">
+  <span class="pc-only"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 或 <kbd>WASD</kbd> 移动 · <kbd>空格</kbd> 暂停</span><br>
+  手机端可直接在棋盘上滑动转向
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- 常量 ----------
+  const COLS = 21, ROWS = 21, CELL = 24;
+  const W = COLS * CELL, H = ROWS * CELL;
+
+  // 食物色板（钢甲色不在其中，因此初始三节永不参与消除）
+  const PALETTE = [
+    { c: '#ff4d6d', glow: 'rgba(255,77,109,',  name: '红' },
+    { c: '#ffb020', glow: 'rgba(255,176,32,',  name: '黄' },
+    { c: '#2dd4a7', glow: 'rgba(45,212,167,',  name: '绿' },
+    { c: '#4ea8ff', glow: 'rgba(78,168,255,',  name: '蓝' },
+  ];
+  const PALETTE_COLORS = PALETTE.map(p => p.c);
+  const FIXED_COLOR = '#9aa5b1';   // 初始钢甲
+  const JUNK_COLOR  = '#8f7fc4';   // 干扰块（永不成三连，只能被相邻消除挤掉）
+  const HEAD_COLOR  = '#e8f1ff';
+  const DIRS = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+
+  // ---------- 画布 ----------
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const scoreVal = $('scoreVal'), bestVal = $('bestVal'), lenVal = $('lenVal');
+  const strip = $('strip');
+  const tailRunEl = $('tailRun');
+  const startOverlay = $('startOverlay'), pauseOverlay = $('pauseOverlay'), overOverlay = $('overOverlay');
+
+  // ---------- 状态 ----------
+  let snake = [];          // [{x,y}] 0 为蛇头
+  let colors = [];         // colors[i] 为相对蛇头第 i 节的颜色，colors[0]=null
+  let pendingGrowth = 0;   // 待长出的节数
+  let dir = { x: 1, y: 0 };
+  let dirQueue = [];
+  let foods = [];          // [{kind:'normal'|'stack'|'junk', color, cells:[{x,y}], blocks:n}]
+  let junkDelay = 0;       // 干扰块重新生成的步数倒计时
+  let score = 0;
+  let best = +(localStorage.getItem('snakeMatchBest') || 0);
+  let state = 'ready';     // ready | playing | paused | over
+  let stepMs = 130, acc = 0, lastTime = 0, tick = 0;
+  let shake = 0, flash = 0;
+  let particles = [], popups = [], announces = [];
+
+  bestVal.textContent = best;
+
+  // ---------- 工具 ----------
+  const key = (x, y) => x + ',' + y;
+  function occupiedSet() {
+    const s = new Set();
+    for (const p of snake) s.add(key(p.x, p.y));
+    for (const g of foods) for (const c of g.cells) s.add(key(c.x, c.y));
+    return s;
+  }
+  function freeCell(occ, avoidSet) {
+    for (let t = 0; t < 300; t++) {
+      const x = (Math.random() * COLS) | 0, y = (Math.random() * ROWS) | 0;
+      if (!occ.has(key(x, y)) && !(avoidSet && avoidSet.has(key(x, y)))) return { x, y };
+    }
+    return null;
+  }
+
+  // ---------- 食物 ----------
+  // kind = 'normal' 彩色相连食物（1~3 节，形状随机）
+  //      = 'stack'  叠层食物：只占 1 格，但叠着 2~4 节同色（一次吃出长条同色）
+  //      = 'junk'   干扰食物：只占 1 格，污染色，永不成三连
+  function spawnFood(kind, n) {
+    let color;
+    if (kind === 'junk') color = JUNK_COLOR;
+    else if (kind === 'stack') {
+      // 叠层刻意复制场上某个彩色食物的颜色，让玩家能稳定凑出 4~7 连
+      const nc = foods.filter(g => g.kind === 'normal').map(g => g.color);
+      color = nc.length ? nc[(Math.random() * nc.length) | 0]
+                        : PALETTE[(Math.random() * PALETTE.length) | 0].c;
+    } else {
+      const used = foods.filter(g => g.kind === 'normal').map(g => g.color);
+      const pool = PALETTE.map(p => p.c).filter(c => !used.includes(c));
+      const arr = pool.length ? pool : PALETTE.map(p => p.c);
+      color = arr[(Math.random() * arr.length) | 0];
+    }
+
+    const occ = occupiedSet();
+    const head = freeCell(occ);
+    if (!head) return;
+    const cells = [head];
+    occ.add(key(head.x, head.y));
+
+    if (kind === 'normal') {
+      // 从种子格向外随机生长出相连的 n 节（相邻形状，可能是 L 形、方块等）
+      for (let k = 1; k < n; k++) {
+        const cands = [];
+        for (const c of cells)
+          for (const d of DIRS) {
+            const nx = c.x + d.x, ny = c.y + d.y;
+            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && !occ.has(key(nx, ny)))
+              cands.push({ x: nx, y: ny });
+          }
+        if (!cands.length) break;  // 极端拥挤时允许缺节
+        const pick = cands[(Math.random() * cands.length) | 0];
+        cells.push(pick);
+        occ.add(key(pick.x, pick.y));
+      }
+      foods.push({ kind, color, cells, blocks: cells.length });
+    } else {
+      // 叠层 / 干扰：单格承载 n 节
+      foods.push({ kind, color, cells, blocks: n });
+    }
+  }
+
+  // ---------- 游戏流程 ----------
+  function reset() {
+    const cx = (COLS / 2) | 0, cy = (ROWS / 2) | 0;
+    snake = [{x: cx, y: cy}, {x: cx-1, y: cy}, {x: cx-2, y: cy}, {x: cx-3, y: cy}];
+    colors = [null, FIXED_COLOR, FIXED_COLOR, FIXED_COLOR];
+    pendingGrowth = 0;
+    dir = { x: 1, y: 0 }; dirQueue = [];
+    foods = [];
+    score = 0; stepMs = 130; acc = 0;
+    shake = 0; flash = 0;
+    particles = []; popups = [];
+    junkDelay = 0;
+    // 场上构成：3 组彩色食物（1/2/3 节）+ 1 组叠层 + 1 个干扰块
+    spawnFood('normal', 1); spawnFood('normal', 2); spawnFood('normal', 3);
+    spawnFood('stack', 2 + ((Math.random() * 3) | 0));
+    spawnFood('junk', 1);
+    announces = [];
+    updateHUD();
+  }
+
+  function startGame() {
+    reset();
+    state = 'playing';
+    startOverlay.classList.add('hidden');
+    overOverlay.classList.add('hidden');
+    pauseOverlay.classList.add('hidden');
+  }
+
+  function gameOver() {
+    state = 'over';
+    if (score > best) { best = score; localStorage.setItem('snakeMatchBest', best); bestVal.textContent = best; }
+    $('finalScore').textContent = score;
+    overOverlay.classList.remove('hidden');
+    burst(snake[0].x, snake[0].y, '#ff4d6d', 26);
+    shake = 10;
+  }
+
+  function togglePause() {
+    if (state === 'playing') { state = 'paused'; pauseOverlay.classList.remove('hidden'); }
+    else if (state === 'paused') { state = 'playing'; pauseOverlay.classList.add('hidden'); lastTime = performance.now(); }
+  }
+
+  // ---------- 转向 ----------
+  function setDir(d) {
+    const map = { up:{x:0,y:-1}, down:{x:0,y:1}, left:{x:-1,y:0}, right:{x:1,y:0} };
+    const nd = map[d]; if (!nd) return;
+    const last = dirQueue.length ? dirQueue[dirQueue.length - 1] : dir;
+    if (nd.x === -last.x && nd.y === -last.y) return;   // 禁止 180° 掉头
+    if (nd.x === last.x && nd.y === last.y) return;
+    if (dirQueue.length < 3) dirQueue.push(nd);
+    if (state === 'ready') startGame();
+  }
+
+  const runScore = n => 30 + (n - 3) * 20;
+  // 连杀称号：连锁第 2 次起触发，5 次以上为超神
+  const KILL_NAMES = { 2: '双杀', 3: '三杀', 4: '四杀', 5: '五杀' };
+  const killText = m => m > 5 ? '超神' : KILL_NAMES[m];
+  // 多连称号
+  const sizeLabelOf = n => n >= 6 ? 'unbelievable!' : n === 5 ? 'amazing!' : n === 4 ? 'good!' : '正常消';
+
+  // ---------- 消除逻辑（尾连制）----------
+  // 规则：只有"刚吃进来的颜色 == 吃之前蛇尾的颜色"才触发结算；
+  // 触发后蛇尾同色段 ≥3 节即整段消除（挂在蛇尾的异色块不会自己炸）；
+  // 消除后若新的蛇尾又是 ≥3 的同色段，则继续连锁（双杀~超神）。
+  function resolveTailPop() {
+    let mult = 1, anyRemoved = false;   // mult = 当前是连锁第几波
+    for (;;) {
+      // 以色块序表为准（刚吃下的块虽还没"长进"蛇身，但也算尾连的一部分）
+      const maxIdx = colors.length - 1;
+      if (maxIdx < 3) break;
+      const c = colors[maxIdx];
+      if (!c || !PALETTE_COLORS.includes(c)) break;   // 尾部是干扰块/钢甲 → 不消
+      let start = maxIdx;
+      while (start - 1 >= 1 && colors[start - 1] === c) start--;
+      const n = maxIdx - start + 1;
+      if (n < 3) break;
+      anyRemoved = true;
+
+      // 要清除的位置：尾连同色段 + 紧贴其内侧的干扰块（被挤碎）
+      const kill = new Set();
+      for (let i = start; i <= maxIdx; i++) kill.add(i);
+      let junkKilled = 0;
+      if (start - 1 >= 1 && colors[start - 1] === JUNK_COLOR) { kill.add(start - 1); junkKilled++; }
+
+      const mid = snake[Math.min(start + ((n / 2) | 0), snake.length - 1)] || snake[0];
+      const kl = mult >= 2 ? killText(mult) : null;
+      const label = (kl ? kl + ' ' : '') + sizeLabelOf(n);
+      popups.push({
+        x: mid.x, y: mid.y, life: 1,
+        text: label + ' +' + (runScore(n) * mult),
+        color: c,
+        big: mult >= 2 || n >= 5,
+      });
+      for (const i of kill) {
+        const cc = snake[i];
+        if (cc) burst(cc.x, cc.y, colors[i] || '#ffffff', 6);
+      }
+
+      score += runScore(n) * mult + junkKilled * 15;
+
+      if (mult >= 2) {
+        const m = mult;
+        announces.push({
+          text: killText(m) + '!', life: 1.5,
+          color: m > 5 ? '#ff4d6d' : m === 5 ? '#ffb020' : '#ffd166',
+        });
+      }
+      if (n >= 6) announces.push({ text: 'UNBELIEVABLE!', life: 1.5, color: '#b14eff' });
+
+      for (const i of [...kill].sort((a, b) => b - a)) colors.splice(i, 1);
+      while (snake.length > colors.length && snake.length > 1) snake.pop();
+      // 关键修复：消除可能发生在"吃到食物但还没长完"的期间，
+      // 必须按色块数与蛇身的差值重算待长节数，否则蛇会多长出灰色兜底块
+      pendingGrowth = Math.max(0, colors.length - snake.length);
+      mult = Math.min(mult + 1, 8);
+      shake = Math.max(shake, 5 + Math.min(mult, 6) * 1.5);
+      flash = Math.max(flash, .55);
+    }
+    return anyRemoved;
+  }
+
+  // ---------- 每步推进 ----------
+  function step() {
+    // 取出有效转向
+    while (dirQueue.length) {
+      const d = dirQueue.shift();
+      if (!(d.x === -dir.x && d.y === -dir.y)) { dir = d; break; }
+    }
+    const head = snake[0];
+    const nh = { x: head.x + dir.x, y: head.y + dir.y };
+
+    // 撞墙
+    if (nh.x < 0 || nh.x >= COLS || nh.y < 0 || nh.y >= ROWS) return gameOver();
+    // 咬到自己（若尾部即将让位，则最后一节不算）
+    const limit = pendingGrowth > 0 ? snake.length : snake.length - 1;
+    for (let i = 0; i < limit; i++)
+      if (snake[i].x === nh.x && snake[i].y === nh.y) return gameOver();
+
+    snake.unshift(nh);
+
+    // 吃食物（碰到哪组就吃掉整组）
+    const fi = foods.findIndex(g => g.cells.some(c => c.x === nh.x && c.y === nh.y));
+    let tailPopQueued = false;
+    if (fi >= 0) {
+      const g = foods[fi];
+      foods.splice(fi, 1);
+      // 尾连规则：吃的颜色必须与"吃之前"蛇尾的颜色相同，才可能触发消除；
+      // 颜色不同（如绿尾吃黄色三连块）就只是挂在蛇尾，等以后同色再喂
+      const tailColor = colors.length ? colors[colors.length - 1] : null;
+      const matchTail = g.kind !== 'junk' && tailColor === g.color;
+      pendingGrowth += g.blocks;
+      for (let k = 0; k < g.blocks; k++) colors.push(g.color);
+      if (matchTail) tailPopQueued = true;
+
+      if (g.kind === 'junk') {
+        // 干扰块：不加分，只往蛇尾塞不可消除的死块
+        popups.push({ x: nh.x, y: nh.y, life: 1, text: '干扰 ×' + g.blocks, color: '#c9bdf5' });
+        burst(nh.x, nh.y, JUNK_COLOR, 8);
+        junkDelay = 5 + ((Math.random() * 8) | 0);
+      } else {
+        const pts = g.blocks * (g.kind === 'stack' ? 15 : 10);
+        score += pts;
+        popups.push({
+          x: nh.x, y: nh.y, life: 1,
+          text: (g.kind === 'stack' ? '叠层 ×' + g.blocks + '  ' : '') + '+' + pts,
+          color: g.color,
+          big: g.kind === 'stack',
+        });
+        burst(nh.x, nh.y, g.color, g.kind === 'stack' ? 14 : 10);
+        spawnFood(g.kind, g.kind === 'stack' ? 2 + ((Math.random() * 3) | 0) : g.blocks);
+      }
+    }
+
+    if (pendingGrowth > 0) pendingGrowth--; else snake.pop();
+
+    // 干扰块按步数延迟重生，避免刷得太密
+    if (junkDelay > 0) {
+      junkDelay--;
+      if (junkDelay === 0 && !foods.some(f => f.kind === 'junk'))
+        spawnFood('junk', Math.random() < 0.3 ? 2 : 1);
+    }
+
+    // 只有"吃的颜色与蛇尾同色"才结算消除；挂在尾上的异色块不会自己炸
+    if (tailPopQueued) resolveTailPop();
+
+    // 速度随分数缓慢提升
+    stepMs = Math.max(78, 130 - ((score / 300) | 0) * 8);
+    updateHUD();
+  }
+
+  // ---------- HUD ----------
+  function updateHUD() {
+    scoreVal.textContent = score;
+    lenVal.textContent = snake.length;
+    // 蛇身色序条 + 尾连高亮
+    const n = Math.min(colors.length, snake.length);
+    // 尾连：结尾连续同色段（限可消除色），从蛇尾往前数
+    let tailStart = n;   // 尾连段的起始索引（含），>=n 表示无可消尾连
+    if (n > 1) {
+      const tc = colors[n - 1];
+      if (tc && PALETTE_COLORS.includes(tc)) {
+        let i = n - 1;
+        while (i - 1 >= 1 && colors[i - 1] === tc) i--;
+        tailStart = i;
+      }
+    }
+    let html = '';
+    for (let i = 1; i < n; i++)
+      html += '<span class="seg' + (i >= tailStart ? ' tail' : '') + '" style="background:' + colors[i] + '"></span>';
+    strip.innerHTML = html || '<span style="font-size:11px;color:#55618a">空</span>';
+    const tr = tailStart < n ? n - tailStart : 0;
+    tailRunEl.textContent = '尾连 ' + tr + '/3';
+    tailRunEl.style.color = tr >= 3 ? '#ff4d6d' : tr === 2 ? '#ffd166' : '#6b7699';
+    tailRunEl.style.fontWeight = tr >= 2 ? '700' : '400';
+  }
+
+  // ---------- 特效 ----------
+  function burst(gx, gy, color, n) {
+    const px = gx * CELL + CELL / 2, py = gy * CELL + CELL / 2;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3;
+      particles.push({
+        x: px, y: py, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 1, size: 2 + Math.random() * 3, color,
+      });
+    }
+  }
+
+  // ---------- 绘制 ----------
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+    else {
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+  }
+
+  function draw() {
+    ctx.save();
+    if (shake > 0.2)
+      ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+
+    // 背景
+    ctx.clearRect(-20, -20, W + 40, H + 40);
+    ctx.fillStyle = '#10141f';
+    ctx.fillRect(-20, -20, W + 40, H + 40);
+    ctx.strokeStyle = 'rgba(140,170,255,0.045)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < COLS; i++) {
+      ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, H); ctx.stroke();
+    }
+    for (let i = 1; i < ROWS; i++) {
+      ctx.beginPath(); ctx.moveTo(0, i * CELL); ctx.lineTo(W, i * CELL); ctx.stroke();
+    }
+
+    const pulse = .5 + .5 * Math.sin(tick / 180);
+
+    // 食物
+    for (const g of foods) {
+      const c0 = g.cells[0];
+      const pal = PALETTE.find(p => p.c === g.color) || PALETTE[0];
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+      if (g.kind === 'junk') {
+        // 干扰块：暗紫斜纹，一眼看出"消不掉"
+        const pad = 3, bx = c0.x * CELL + pad, by = c0.y * CELL + pad, bw = CELL - pad * 2;
+        ctx.shadowColor = 'rgba(143,127,196,0.6)';
+        ctx.shadowBlur = 9 + pulse * 7;
+        rr(bx, by, bw, bw, 6); ctx.fillStyle = '#2c2640'; ctx.fill();
+        ctx.save(); rr(bx, by, bw, bw, 6); ctx.clip();
+        ctx.strokeStyle = 'rgba(150,132,205,0.9)'; ctx.lineWidth = 2;
+        for (let sx = -bw; sx < bw * 2; sx += 7) {
+          ctx.beginPath(); ctx.moveTo(bx + sx, by - 2); ctx.lineTo(bx + sx + bw + 2, by + bw + 2); ctx.stroke();
+        }
+        ctx.restore();
+        ctx.shadowBlur = 0;
+        rr(bx, by, bw, bw, 6); ctx.strokeStyle = '#a795de'; ctx.lineWidth = 1.2; ctx.stroke();
+        ctx.fillStyle = 'rgba(232,226,255,0.95)';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.fillText('×' + g.blocks, bx + bw / 2, by + bw / 2 + 1);
+
+      } else if (g.kind === 'stack') {
+        // 叠层食物：错位堆叠的同色卡片
+        const pad = 4.5, bx = c0.x * CELL + pad, by = c0.y * CELL + pad, bw = CELL - pad * 2;
+        ctx.shadowColor = pal.glow + (0.4 + pulse * 0.4) + ')';
+        ctx.shadowBlur = 18;
+        for (let l = g.blocks - 1; l >= 1; l--) {
+          const o = l * 2.6;
+          ctx.globalAlpha = 0.40 + 0.16 * (g.blocks - l);
+          rr(bx - o, by - o, bw, bw, 5); ctx.fillStyle = g.color; ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        rr(bx, by, bw, bw, 5); ctx.fillStyle = g.color; ctx.fill();
+        ctx.shadowBlur = 0;
+        rr(bx + 3, by + 3, bw - 6, 3.5, 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill();
+        ctx.fillStyle = 'rgba(8,10,20,0.88)';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.fillText('×' + g.blocks, bx + bw / 2, by + bw / 2 + 1);
+
+      } else {
+        // 普通彩色食物：1~3 节相连
+        const multi = g.cells.length > 1;
+        ctx.shadowColor = pal.glow + (0.45 + pulse * 0.4) + ')';
+        ctx.shadowBlur = multi ? 16 : 12;
+        for (const c of g.cells) {
+          const pad = multi ? 1.5 : 4;
+          rr(c.x * CELL + pad, c.y * CELL + pad, CELL - pad * 2, CELL - pad * 2, multi ? 5 : 8);
+          ctx.fillStyle = g.color; ctx.fill();
+          ctx.shadowBlur = 0;
+          rr(c.x * CELL + pad + 3, c.y * CELL + pad + 3, CELL - pad * 2 - 6, 4, 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill();
+          ctx.shadowBlur = multi ? 16 : 12;
+        }
+        if (g.blocks > 1) {
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = 'rgba(10,12,22,0.75)';
+          ctx.font = 'bold 10px sans-serif';
+          ctx.fillText('×' + g.blocks, c0.x * CELL + CELL / 2, c0.y * CELL + CELL / 2 + 1);
+        }
+      }
+      ctx.restore();
+    }
+
+    // 蛇身（从尾到头，头最后画）
+    const n = snake.length;
+    for (let i = n - 1; i >= 1; i--) {
+      const p = snake[i];
+      const col = i < colors.length ? colors[i] : FIXED_COLOR;
+      const isNeon = PALETTE_COLORS.includes(col);
+      const isJunk = col === JUNK_COLOR;
+      ctx.save();
+      if (isNeon) { ctx.shadowColor = col; ctx.shadowBlur = 9; }
+      else if (isJunk) { ctx.shadowColor = 'rgba(143,127,196,0.85)'; ctx.shadowBlur = 8; }
+      const pad = 2.5;
+      rr(p.x * CELL + pad, p.y * CELL + pad, CELL - pad * 2, CELL - pad * 2, 6);
+      ctx.fillStyle = col; ctx.fill();
+      if (isJunk) {
+        // 干扰块：斜纹标记，提示"它消不掉，只能被相邻消除挤碎"
+        ctx.save();
+        rr(p.x * CELL + pad, p.y * CELL + pad, CELL - pad * 2, CELL - pad * 2, 6);
+        ctx.clip();
+        ctx.strokeStyle = 'rgba(45,38,64,0.75)'; ctx.lineWidth = 2;
+        for (let sx = -CELL; sx < CELL * 2; sx += 7) {
+          ctx.beginPath();
+          ctx.moveTo(p.x * CELL + sx, p.y * CELL);
+          ctx.lineTo(p.x * CELL + sx + CELL, p.y * CELL + CELL);
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else if (!isNeon) { // 钢甲质感
+        ctx.shadowBlur = 0;
+        rr(p.x * CELL + pad + 2, p.y * CELL + pad + 2, CELL - pad * 2 - 4, 3, 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 蛇头
+    const h = snake[0];
+    ctx.save();
+    ctx.shadowColor = 'rgba(78,168,255,0.9)'; ctx.shadowBlur = 14;
+    rr(h.x * CELL + 1.5, h.y * CELL + 1.5, CELL - 3, CELL - 3, 7);
+    ctx.fillStyle = HEAD_COLOR; ctx.fill();
+    ctx.restore();
+    // 眼睛
+    const ex = h.x * CELL + CELL / 2, ey = h.y * CELL + CELL / 2;
+    const ox = dir.x * 4, oy = dir.y * 4;
+    const px2 = dir.x === 0 ? 4.5 : 0, py2 = dir.y === 0 ? 4.5 : 0;
+    ctx.fillStyle = '#0b0e17';
+    ctx.beginPath(); ctx.arc(ex + ox + px2, ey + oy + py2, 2.2, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(ex + ox - px2, ey + oy - py2, 2.2, 0, 7); ctx.fill();
+
+    // 消除白闪
+    if (flash > 0.02) {
+      ctx.fillStyle = 'rgba(255,255,255,' + flash * 0.35 + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // 粒子
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(p.life, 0);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+
+    // 飘分
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const p of popups) {
+      ctx.globalAlpha = Math.max(p.life, 0);
+      ctx.font = p.big ? '800 17px sans-serif' : 'bold 13px sans-serif';
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+      ctx.fillText(p.text, p.x * CELL + CELL / 2, p.y * CELL + CELL / 2 - (1 - p.life) * 22);
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+
+    // 中央连杀/多连称号播报
+    for (let i = 0; i < announces.length; i++) {
+      const a = announces[i];
+      const grow = (1.5 - a.life) * 8;   // 轻微放大入场
+      ctx.globalAlpha = Math.max(Math.min(1, a.life * 1.6), 0);
+      ctx.font = '800 ' + (26 + grow) + 'px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = a.color;
+      ctx.shadowColor = a.color; ctx.shadowBlur = 22;
+      ctx.fillText(a.text, W / 2, H / 2 - 46 - i * 36);
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.restore();
+  }
+
+  // ---------- 主循环 ----------
+  function loop(t) {
+    requestAnimationFrame(loop);
+    const dt = Math.min(t - lastTime, 100);
+    lastTime = t;
+    tick = t;
+
+    if (state === 'playing') {
+      acc += dt;
+      while (acc >= stepMs && state === 'playing') { acc -= stepMs; step(); }
+    }
+
+    // 特效推进
+    if (shake > 0) shake *= 0.86;
+    if (flash > 0) flash *= 0.85;
+    for (const p of particles) {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life -= 0.028;
+    }
+    particles = particles.filter(p => p.life > 0);
+    for (const p of popups) p.life -= 0.022;
+    popups = popups.filter(p => p.life > 0);
+    for (const a of announces) a.life -= 0.016;
+    announces = announces.filter(a => a.life > 0);
+
+    draw();
+  }
+
+  // ---------- 输入 ----------
+  const KEYMAP = {
+    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+    w: 'up', s: 'down', a: 'left', d: 'right',
+    W: 'up', S: 'down', A: 'left', D: 'right',
+  };
+  window.addEventListener('keydown', e => {
+    if (KEYMAP[e.key]) { e.preventDefault(); setDir(KEYMAP[e.key]); return; }
+    if (e.key === ' ') {
+      e.preventDefault();
+      if (state === 'ready') startGame();
+      else if (state === 'over') startGame();
+      else togglePause();
+    }
+    if (e.key === 'Enter' && state !== 'playing') startGame();
+  });
+
+  document.querySelectorAll('.dpad button').forEach(b => {
+    b.addEventListener('pointerdown', e => { e.preventDefault(); setDir(b.dataset.d); });
+  });
+
+  // 触屏滑动
+  let ts = null;
+  canvas.addEventListener('touchstart', e => {
+    ts = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, { passive: true });
+  canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+  canvas.addEventListener('touchend', e => {
+    if (!ts) return;
+    const dx = e.changedTouches[0].clientX - ts.x, dy = e.changedTouches[0].clientY - ts.y;
+    if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+    setDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+    ts = null;
+  });
+
+  $('startBtn').addEventListener('click', startGame);
+  $('retryBtn').addEventListener('click', startGame);
+  $('resumeBtn').addEventListener('click', togglePause);
+  window.addEventListener('blur', () => { if (state === 'playing') togglePause(); });
+
+  // ---------- 启动 ----------
+  reset();
+  requestAnimationFrame(t => { lastTime = t; loop(t); });
+})();
+</script>
+</body>
+</html>

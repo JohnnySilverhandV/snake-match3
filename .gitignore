@@ -1,0 +1,6 @@
+# 本地/发布相关
+.workbuddy/
+.wbapp_*.genie
+node_modules/
+.DS_Store
+Thumbs.db
