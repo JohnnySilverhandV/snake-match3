@@ -2,7 +2,10 @@
 
 贪吃蛇 × 三消的融合小游戏。单文件 HTML，零依赖，双击 `snake-match3.html` 即可玩，也可直接部署为静态站点。
 
-在线试玩：https://snake-match3.app.workbuddy.host/?sharecode=WYM5RVJC46
+## 在线试玩
+
+- **GitHub Pages（推荐，永久有效）**：https://johnnysilverhandv.github.io/snake-match3/
+- WorkBuddy 托管：https://snake-match3.app.workbuddy.host/?sharecode=WYM5RVJC46
 
 ## 玩法
 
